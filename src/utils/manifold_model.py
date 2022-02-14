@@ -241,11 +241,11 @@ class ManifoldEncoderLayer(Module):
                  ln_attention=False, return_map=False, **kwargs):
         super(ManifoldEncoderLayer, self).__init__()
         self.pre_norm = LayerNorm(d_model)
-        if attention_type == 'riem':
+        if attention_type == 'spd':
             self.self_attn = EuclideanRiemmanianAtt(dim=d_model, num_heads=nhead,
                                                     attention_dropout=attention_dropout, projection_dropout=dropout,
                                                     sequence_length=sequence_length, ln_attention=ln_attention)
-        elif attention_type == 'all':
+        elif attention_type == 'e_spd_gm':
             self.self_attn = EuclRiemGrassAtt(dim=d_model, num_heads=nhead,
                                               attention_dropout=attention_dropout, projection_dropout=dropout,
                                               sequence_length=sequence_length, ln_attention=ln_attention,

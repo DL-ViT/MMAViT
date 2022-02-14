@@ -488,5 +488,84 @@ def sublpot_attention():
 
 #sublpot_image_patches()
 #sublpot_attention()
+
+
+def set_size(width, fraction=1):
+    """Set figure dimensions to avoid scaling in LaTeX.
+
+    Parameters
+    ----------
+    width: float
+            Document textwidth or columnwidth in pts
+    fraction: float, optional
+            Fraction of the width which you wish the figure to occupy
+
+    Returns
+    -------
+    fig_dim: tuple
+            Dimensions of figure in inches
+    """
+    # Width of figure (in pts)
+    fig_width_pt = width * fraction
+
+    # Convert from pt to inches
+    inches_per_pt = 1 / 72.27
+
+    # Golden ratio to set aesthetic figure height
+    # https://disq.us/p/2940ij3
+    golden_ratio = (5**.5 - 1) / 2
+
+    # Figure width in inches
+    fig_width_in = fig_width_pt * inches_per_pt
+    # Figure height in inches
+    fig_height_in = fig_width_in * golden_ratio
+
+    fig_dim = (fig_width_in, fig_height_in)
+
+    return fig_dim
+
+
+def plot_fig():
+    plt.style.use('seaborn')
+    plt.rc('font', family='serif')
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex"    : True,
+        "font.family"    : "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize" : 11,
+        "font.size"      : 11,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8
+    }
+
+    #plt.rcParams.update(tex_fonts)
+    #plt.style.use('tex')
+    width = 345
+    fig, ax = plt.subplots(1, 1, figsize=set_size(width))
+    y = np.array([69.20,75.70])
+    x  = np.array([0.21,0.25])
+    line1, = ax.plot(x, y,'--',color='green')
+    l11 = ax.scatter(x[:1], y[:1],color='green',marker='x')
+    l12 = ax.scatter(x[1:], y[1:], color='green', marker='o')
+    y = np.array([72.25,77.05])
+    x  = np.array([0.20,0.24])
+    line2, = ax.plot(x, y,'--',color='red')
+    l21 = ax.scatter(x[:1], y[:1],color='red',marker='x')
+    l22 = ax.scatter(x[1:], y[1:], color='red', marker='o')
+
+    y = np.array([74.77,79.31])
+    x  = np.array([0.28,0.32])
+    line3, = ax.plot(x, y,'--',color='blue')
+    l31 = ax.scatter(x[:1], y[:1],color='blue',marker='x')
+    l32 = ax.scatter(x[1:], y[1:], color='blue', marker='o')
+    ax.set_ylabel(r'Accuracy (%)')
+    ax.set_xlabel(r'FLOPS (G)')
+
+    ax.legend([l11, l12,l21,l22,l31,l32], ['ViT-Lite-6/4','ViT-Lite-6/4*' ,'CVT-6/4','CVT-6/4*','CCT-7/3x2','CCT-7/3x2*'])
+    plt.show()
 if __name__ == '__main__':
-    sublpot_attention()
+    #sublpot_attention()
+    plot_fig()

@@ -88,8 +88,8 @@ def arguments():
                         help='dataset validation split (default: validation)')
     parser.add_argument('--model', default='resnet101', type=str, metavar='MODEL',
                         help='Name of model to train (default: "countception"')
-    parser.add_argument('--attention_type', default='riem', type=str, metavar='ATT',
-                        help='Type of attention to use', choices=('self', 'gm', 'riem', 'all'))
+    parser.add_argument('--attention_type', default='e_spd_gm', type=str, metavar='ATT',
+                        help='Type of attention to use', choices=('self', 'gm', 'spd', 'e_spd_gm'))
     parser.add_argument('--pretrained', action='store_true', default=False,
                         help='Start with pretrained version of specified network (if avail)')
     parser.add_argument('--initial-checkpoint', default='', type=str, metavar='PATH',
