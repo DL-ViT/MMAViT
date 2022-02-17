@@ -73,6 +73,14 @@ default_cfgs = {
         'first_conv': 'patch_embed.conv', 'classifier': 'head',
 
     },
+    'pit_xti_32': {
+
+        'num_classes': 1000, 'input_size': (3, 32, 32), 'pool_size': None,
+        'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
+        'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
+        'first_conv': 'patch_embed.conv', 'classifier': 'head',
+
+    },
 }
 
 
@@ -391,7 +399,22 @@ def pit_ti_32(pretrained, **kwargs):
         base_dims=[48, 48,48],
         depth=[2, 6, 4],
         heads=[2, 4, 8],
-        mlp_ratio=2,
+        mlp_ratio=4,
         **kwargs
     )
     return _create_pit('pit_ti_32', pretrained, **model_kwargs)
+
+
+
+@register_model
+def pit_xti_32(pretrained, **kwargs):
+    model_kwargs = dict(
+        patch_size=2,
+        stride=2,
+        base_dims=[48, 48,48],
+        depth=[2, 6, 4],
+        heads=[2, 4, 8],
+        mlp_ratio=2,
+        **kwargs
+    )
+    return _create_pit('pit_xti_32', pretrained, **model_kwargs)

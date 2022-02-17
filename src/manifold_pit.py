@@ -28,7 +28,7 @@ try:
     from timm.models.registry import register_model
 except ImportError:
     from .registry import register_model
-from src.utils.grassman_utils import grassmanian_point
+from src.utils.lds import grassmanian_point
 from src.utils.riemmanian_model import cov_frobenius_norm
 
 def _cfg(url='', **kwargs):
@@ -74,13 +74,22 @@ default_cfgs = {
         'first_conv': 'patch_embed.conv', 'classifier': 'head',
 
     },
+
+    'manifold_pit_xti_32': {
+
+        'num_classes': 1000, 'input_size': (3, 32, 32), 'pool_size': None,
+        'crop_pct': .9, 'interpolation': 'bicubic', 'fixed_input_size': True,
+        'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
+        'first_conv': 'patch_embed.conv', 'classifier': 'head',
+
+    },
 }
 
 
 
 class EuclRiemGrassAtt(nn.Module):
     def __init__(self, dim, num_heads=8, qkv_bias=True, attention_dropout=0.1, projection_dropout=0.1,
-                 sequence_length=1,
+                 seq_len=1,
                  ln_attention=True, return_map=False):
         super().__init__()
 
@@ -94,30 +103,26 @@ class EuclRiemGrassAtt(nn.Module):
         self.attn_drop = nn.Dropout(attention_dropout)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(projection_dropout)
-        self.sequence_len = sequence_length
+        self.seq_len = seq_len
 
         self.conv_attn = nn.Sequential(
-            nn.InstanceNorm2d(3 * num_heads),
-            nn.Conv2d(in_channels=3 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1))
+            #nn.LayerNorm((3 * num_heads,seq_len,seq_len),eps=1e-6),
+            nn.Conv2d(in_channels=3 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1)),
+            nn.BatchNorm2d(num_heads)
         )
 
         self.return_map = return_map
 
     def forward(self, x):
+       # print(f'x {x.shape}')
         B, N, C = x.shape
 
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
-        # qkvshape 3, B, H, N, C'
-        #   q.shape B, H, N, C'
-       # print(q.shape)
 
         qgr, _ = grassmanian_point(q)
         kgr, _ = grassmanian_point(k)
-        # print(qgr.shape)
-        # # rieem_attn = log_dist(q, k, use_covariance=True, use_log=False)
-        #
-        qgr = qgr
+
         # kgr shape B, H, C', N
         kgr = kgr.permute(0, 1, 3, 2)
 
@@ -125,7 +130,7 @@ class EuclRiemGrassAtt(nn.Module):
 
         attn_grassmman = torch.linalg.norm(dots, dim=2) ** 2. * self.grassman_scale
         attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn_riemmanian = self.attn_drop(cov_frobenius_norm(q, k) * self.riem_scale)
+        attn_riemmanian = (cov_frobenius_norm(q, k) * self.riem_scale)
         # print(attn_riemmanian.shape)
         attn_ = self.conv_attn(torch.cat((attn, attn_riemmanian, attn_grassmman), dim=1)).softmax(
             dim=-1)
@@ -141,10 +146,11 @@ class EuclRiemGrassAtt(nn.Module):
 class Block(nn.Module):
 
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm,seq_len =1):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = EuclRiemGrassAtt(dim, num_heads=num_heads, qkv_bias=qkv_bias, attention_dropout=attn_drop, projection_dropout=drop )
+        self.attn = EuclRiemGrassAtt(dim, num_heads=num_heads, qkv_bias=qkv_bias, attention_dropout=attn_drop,
+                                     projection_dropout=drop,seq_len=seq_len)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -169,7 +175,7 @@ class SequentialTuple(nn.Sequential):
 
 class Transformer(nn.Module):
     def __init__(
-            self, base_dim, depth, heads, mlp_ratio, pool=None, drop_rate=.0, attn_drop_rate=.0, drop_path_prob=None):
+            self, base_dim, depth, heads, mlp_ratio, pool=None, drop_rate=.0, attn_drop_rate=.0, drop_path_prob=None,seq_len=1):
         super(Transformer, self).__init__()
         self.layers = nn.ModuleList([])
         embed_dim = base_dim * heads
@@ -183,7 +189,8 @@ class Transformer(nn.Module):
                 drop=drop_rate,
                 attn_drop=attn_drop_rate,
                 drop_path=drop_path_prob[i],
-                norm_layer=partial(nn.LayerNorm, eps=1e-6)
+                norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                seq_len=seq_len
             )
             for i in range(depth)])
 
@@ -244,7 +251,7 @@ class PoolingVisionTransformer(nn.Module):
     """
     def __init__(self, img_size, patch_size, stride, base_dims, depth, heads,
                  mlp_ratio, num_classes=1000, in_chans=3, distilled=False,
-                 attn_drop_rate=.0, drop_rate=.0, drop_path_rate=.0,attention_type='all',**kwargs):
+                 attn_drop_rate=.0, drop_rate=.0, drop_path_rate=.0,attention_type='all',seq_len=[256],**kwargs):
         super(PoolingVisionTransformer, self).__init__()
 
         padding = 0
@@ -268,18 +275,21 @@ class PoolingVisionTransformer(nn.Module):
         transformers = []
         # stochastic depth decay rule
         dpr = [x.tolist() for x in torch.linspace(0, drop_path_rate, sum(depth)).split(depth)]
+        self.seq_len = [256 + 1, 64 + 1, 17]
         for stage in range(len(depth)):
+
             pool = None
             if stage < len(heads) - 1:
                 pool = ConvHeadPooling(
                     base_dims[stage] * heads[stage], base_dims[stage + 1] * heads[stage + 1], stride=2)
             transformers += [Transformer(
                 base_dims[stage], depth[stage], heads[stage], mlp_ratio, pool=pool,
-                drop_rate=drop_rate, attn_drop_rate=attn_drop_rate, drop_path_prob=dpr[stage])
+                drop_rate=drop_rate, attn_drop_rate=attn_drop_rate, drop_path_prob=dpr[stage],seq_len=self.seq_len[stage])
             ]
         self.transformers = SequentialTuple(*transformers)
         self.norm = nn.LayerNorm(base_dims[-1] * heads[-1], eps=1e-6)
         self.num_features = self.embed_dim = base_dims[-1] * heads[-1]
+
 
         # Classifier head
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -418,7 +428,7 @@ def manifold_pit_ti_224(pretrained, **kwargs):
     return _create_pit('manifold_pit_ti_224', pretrained, **model_kwargs)
 
 @register_model
-def manifold_pit_ti_32(pretrained, **kwargs):
+def manifold_pit_xti_32(pretrained, **kwargs):
     model_kwargs = dict(
         patch_size=2,
         stride=2,
@@ -426,6 +436,20 @@ def manifold_pit_ti_32(pretrained, **kwargs):
         depth=[2, 6, 4],
         heads=[2, 4, 8],
         mlp_ratio=2,
+        **kwargs
+    )
+    return _create_pit('manifold_pit_xti_32', pretrained, **model_kwargs)
+
+
+@register_model
+def manifold_pit_ti_32(pretrained, **kwargs):
+    model_kwargs = dict(
+        patch_size=2,
+        stride=2,
+        base_dims=[48, 48,48],
+        depth=[2, 6, 4],
+        heads=[2, 4, 8],
+        mlp_ratio=4,
         **kwargs
     )
     return _create_pit('manifold_pit_ti_32', pretrained, **model_kwargs)

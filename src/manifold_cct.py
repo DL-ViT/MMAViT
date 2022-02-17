@@ -93,13 +93,8 @@ class ManifoldCCT(nn.Module):
         )
 
     def forward(self, x):
-        # with torch.no_grad():
-        x = self.tokenizer(x)
 
-        # print(x.shape, om.shape)
-        # print(om.shape)
-        # x  = self.tokenizer(x)sss
-        # om = self.project(om)
+        x = self.tokenizer(x)
 
         return self.classifier(x)
 

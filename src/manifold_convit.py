@@ -34,7 +34,7 @@ except ImportError:
 from timm.models.vision_transformer_hybrid import HybridEmbed
 
 from src.utils.riemmanian_model import cov_frobenius_norm
-from src.utils.grassman_utils import grassmanian_point
+from src.utils.lds import grassmanian_point
 import torch
 import torch.nn as nn
 

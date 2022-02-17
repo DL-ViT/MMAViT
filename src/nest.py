@@ -60,6 +60,7 @@ default_cfgs = {
     'nest_small'   : _cfg(),
     'nest_tiny'    : _cfg(),
     'nest_tiny_32'    : _cfg32(),
+    'nest_tiny_s16_32'    : _cfg32(),
     'jx_nest_base' : _cfg(
         url='https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vt3p-weights/jx_nest_base'
             '-8bc41011.pth'),
@@ -458,6 +459,15 @@ def nest_tiny_32(pretrained=False, **kwargs):
     model = _create_nest('nest_tiny_32', pretrained=pretrained, **model_kwargs)
     return model
 
+
+
+@register_model
+def nest_tiny_s16_32(pretrained=False, **kwargs):
+    """ Nest-T @ 224x224
+    """
+    model_kwargs = dict(embed_dims=(192,192,192), num_heads=(3, 3, 3 ), depths=(4,4,4),patch_size=2, **kwargs)
+    model = _create_nest('nest_tiny_s16_32', pretrained=pretrained, **model_kwargs)
+    return model
 
 @register_model
 def jx_nest_base(pretrained=False, **kwargs):

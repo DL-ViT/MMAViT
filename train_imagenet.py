@@ -319,7 +319,7 @@ def main():
 
     args, args_text = _parse_args(config_parser, parser)
 
-    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    #os.environ['CUDA_VISIBLE_DEVICES'] = '1'#args.gpu
     if args.log_wandb:
         if has_wandb:
             wandb.init(project=args.experiment, config=args)
@@ -679,7 +679,7 @@ def train_one_epoch(
     end = time.time()
     last_idx = len(loader) - 1
     num_updates = epoch * len(loader)
-    STEPS = 1024//args.batch_size
+    STEPS = 1#024//args.batch_size
     for batch_idx, (input, target) in enumerate(loader):
         last_batch = batch_idx == last_idx
         data_time_m.update(time.time() - end)

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from torch.nn import Module, ModuleList, Linear, Dropout, LayerNorm, Identity, Parameter, init
 
-from .grassman_utils import grassmanian_point
+from .lds import grassmanian_point
 from .stochastic_depth import DropPath
 
 

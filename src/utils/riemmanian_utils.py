@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from torch.nn import Module, ModuleList, Linear, Dropout, LayerNorm, Identity, Parameter, init
 
-from .grassman_utils import log_dist
+from src.utils.riemmanian_model import log_dist,cov_frobenius_norm
 from .stochastic_depth import DropPath
 
 
@@ -30,7 +30,7 @@ class RiemmanianAttention(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-        dots = log_dist(q, k, use_covariance=True, use_log=False)
+        dots = cov_frobenius_norm(q, k)
         if self.sequence_length != -1:
             dots = self.norm(dots)
         out = torch.matmul(self.attn_drop(dots.softmax(dim=-1)), v)

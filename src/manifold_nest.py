@@ -31,7 +31,7 @@ from timm.models.layers import PatchEmbed, Mlp, DropPath, create_classifier, tru
 from timm.models.layers import _assert
 from timm.models.layers import create_conv2d, create_pool2d, to_ntuple
 from timm.models.registry import register_model
-from src.utils.grassman_utils import grassmanian_point
+from src.utils.lds import grassmanian_point
 from src.utils.riemmanian_model import cov_frobenius_norm
 
 def _cfg(url='', **kwargs):
@@ -58,6 +58,7 @@ default_cfgs = {
     'manifold_nest_base'    : _cfg(),
     'manifold_nest_small'   : _cfg(),
     'manifold_nest_tiny_32'    : _cfg32(),
+'manifold_nest_tiny_s16_32'    : _cfg32(),
     'jx_manifold_nest_base' : _cfg(
         url='https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vt3p-weights/jx_manifold_nest_base'
             '-8bc41011.pth'),
@@ -492,6 +493,14 @@ def manifold_nest_tiny_32(pretrained=False, **kwargs):
     """
     model_kwargs = dict(embed_dims=(96, 192, 384), num_heads=(3, 6, 12), depths=(2, 2, 8), **kwargs)
     model = _create_nest('manifold_nest_tiny_32', pretrained=pretrained, **model_kwargs)
+    return model
+
+@register_model
+def manifold_nest_tiny_s16_32(pretrained=False, **kwargs):
+    """ Nest-T @ 224x224
+    """
+    model_kwargs = dict(embed_dims=(192,192,192), num_heads=(3, 3, 3 ), depths=(4,4,4),patch_size=2, **kwargs)
+    model = _create_nest('manifold_nest_tiny_s16_32', pretrained=pretrained, **model_kwargs)
     return model
 
 @register_model

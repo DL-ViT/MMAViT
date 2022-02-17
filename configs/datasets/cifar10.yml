@@ -26,7 +26,7 @@ reprob: 0.25
 remode: pixel
 amp: False
 batch_size: 128
-lr: 25e-5
+lr: 55e-5
 min_lr: 1e-5
 sched: cosine
 weight_decay: 5e-2
@@ -37,4 +37,3 @@ warmup_lr: 0.00001
 opt: adamw
 smoothing: 0.1
 workers: 8
-drop_path: 0.1

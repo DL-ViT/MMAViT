@@ -19,7 +19,8 @@ from timm.models.helpers import build_model_with_cfg, overlay_external_default_c
 from timm.models.layers import PatchEmbed, Mlp, DropPath, trunc_normal_
 from timm.models.registry import register_model
 
-
+from src.utils.lds import grassmanian_point
+from src.utils.riemmanian_model import cov_frobenius_norm
 __all__ = ['Cait', 'ClassAttn', 'LayerScaleBlockClassAttn', 'LayerScaleBlock', 'TalkingHeadAttn']
 
 
@@ -35,6 +36,10 @@ def _cfg(url='', **kwargs):
 
 
 default_cfgs = dict(
+    cait_xxs24_32=_cfg(
+        url='https://dl.fbaipublicfiles.com/deit/XXS24_224.pth',
+        input_size=(3, 32,32),
+    ),
     cait_xxs24_224=_cfg(
         url='https://dl.fbaipublicfiles.com/deit/XXS24_224.pth',
         input_size=(3, 224, 224),
@@ -96,8 +101,21 @@ class ClassAttn(nn.Module):
         q = q * self.scale
         v = self.v(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
 
-        attn = (q @ k.transpose(-2, -1))
-        attn = attn.softmax(dim=-1)
+        qgr, _ = grassmanian_point(q)
+        kgr, _ = grassmanian_point(k)
+
+        kgr = kgr.permute(0, 1, 3, 2)
+
+        dots = torch.matmul(qgr, kgr).unsqueeze(2)
+
+        attn_grassmman = torch.linalg.norm(dots, dim=2) ** 2. * self.grassman_scale
+
+        attn_e = (q @ k.transpose(-2, -1)) * self.scale
+
+        attn_riemmanian = (cov_frobenius_norm(q, k) * self.riem_scale)
+
+        attn = self.conv_attn(torch.cat((attn_e, attn_riemmanian, attn_grassmman), dim=1)).softmax(dim=-1)
+
         attn = self.attn_drop(attn)
 
         x_cls = (attn @ v).transpose(1, 2).reshape(B, 1, C)
@@ -153,13 +171,33 @@ class TalkingHeadAttn(nn.Module):
         self.proj_w = nn.Linear(num_heads, num_heads)
 
         self.proj_drop = nn.Dropout(proj_drop)
+        self.conv_attn = nn.Sequential(
+            #nn.LayerNorm((3 * num_heads,seq_len,seq_len),eps=1e-6),
+            nn.Conv2d(in_channels=3 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1)),
+            nn.BatchNorm2d(num_heads)
+        )
 
     def forward(self, x):
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0] * self.scale, qkv[1], qkv[2]
+        q, k, v = qkv[0], qkv[1], qkv[2]
 
-        attn = (q @ k.transpose(-2, -1))
+        qgr, _ = grassmanian_point(q)
+        kgr, _ = grassmanian_point(k)
+
+        kgr = kgr.permute(0, 1, 3, 2)
+
+        dots = torch.matmul(qgr, kgr).unsqueeze(2)
+
+        attn_grassmman = torch.linalg.norm(dots, dim=2) ** 2. * self.grassman_scale
+
+        attn_e = (q @ k.transpose(-2, -1))* self.scale
+
+
+        attn_riemmanian = (cov_frobenius_norm(q, k) * self.riem_scale)
+
+        attn = self.conv_attn(torch.cat((attn_e, attn_riemmanian, attn_grassmman), dim=1))
+
 
         attn = self.proj_l(attn.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
@@ -172,7 +210,6 @@ class TalkingHeadAttn(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-
 
 class LayerScaleBlock(nn.Module):
     # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
@@ -324,6 +361,13 @@ def _create_cait(variant, pretrained=False, **kwargs):
         **kwargs)
     return model
 
+
+
+@register_model
+def cait_xxs24_32(pretrained=False, **kwargs):
+    model_args = dict(patch_size=4, embed_dim=192, depth=24, num_heads=4, init_scale=1e-5, **kwargs)
+    model = _create_cait('cait_xxs24_32', pretrained=pretrained, **model_args)
+    return model
 
 @register_model
 def cait_xxs24_224(pretrained=False, **kwargs):

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Module, ModuleList, Linear, Dropout, LayerNorm, Identity, Parameter, init
 
-from src.utils.grassman_utils import grassmanian_point
+from src.utils.lds import grassmanian_point
 from src.utils.riemmanian_model import cov_frobenius_norm
 from .stochastic_depth import DropPath
 
@@ -43,23 +43,25 @@ class RiemGrassAtt(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
+        # old_shape = q.shape
 
         qgr, _ = grassmanian_point(q)
         kgr, _ = grassmanian_point(k)
 
+        qgr = qgr  # .permute(0, 1, 3, 2)
         kgr = kgr.permute(0, 1, 3, 2)
 
         dots = torch.matmul(qgr, kgr).unsqueeze(2)
 
         attn_grassmman = torch.linalg.norm(dots, dim=2) ** 2. * self.grassman_scale
 
-        attn_riemmanian = cov_frobenius_norm(q, k) * self.riem_scalee
+        attn_riemmanian = attn_grassmman  # cov_frobenius_norm(q, k) * self.riem_scalee
 
         attn_ = self.conv_attn(torch.cat((attn_riemmanian, attn_grassmman), dim=1)).softmax(
             dim=-1)
 
         out = torch.matmul(self.attn_drop(attn_), v)
-
+        # out = rearrange(out, 'b h n d -> b n (h d)')
         out = out.permute(0, 2, 1, 3).reshape(B, N, C)
         return self.proj_drop(self.proj(out))
 
@@ -81,11 +83,12 @@ class EuclRiemGrassAtt(nn.Module):
         self.proj = Linear(dim, dim)
         self.proj_drop = Dropout(projection_dropout)
         self.sequence_len = sequence_length
-
+        #        self.attn_matrix = nn.Parameter(torch.randn(sequence_length, sequence_length))
         if ln_attention:
             self.conv_attn = nn.Sequential(
                 nn.LayerNorm((3 * num_heads, sequence_length, sequence_length)),
-                nn.Conv2d(in_channels=3 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1))
+                nn.Conv2d(in_channels=3 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1)),
+
             )
         else:
             self.conv_attn = nn.Sequential(
@@ -100,10 +103,11 @@ class EuclRiemGrassAtt(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-
+        # old_shape = q.shape
 
         qgr, _ = grassmanian_point(q)
         kgr, _ = grassmanian_point(k)
+
 
         kgr = kgr.permute(0, 1, 3, 2)
 
@@ -112,12 +116,12 @@ class EuclRiemGrassAtt(nn.Module):
         attn_grassmman = torch.linalg.norm(dots, dim=2) ** 2. * self.grassman_scale
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn_riemmanian = self.attn_drop(cov_frobenius_norm(q, k) * self.riem_scale)
-
+        # print(attn_riemmanian.shape)
         attn_ = self.conv_attn(torch.cat((attn, attn_riemmanian, attn_grassmman), dim=1)).softmax(
             dim=-1)
 
         out = torch.matmul(self.attn_drop(attn_), v)
-
+        # out = rearrange(out, 'b h n d -> b n (h d)')
         out = out.permute(0, 2, 1, 3).reshape(B, N, C)
 
         return self.proj_drop(self.proj(out)), attn_
@@ -131,7 +135,7 @@ class EuclGrassAtt(nn.Module):
         self.num_heads = num_heads
         head_dim = dim // self.num_heads
         self.scale = nn.Parameter(torch.tensor(head_dim ** -0.5))
-
+        # self.riem_scale = nn.Parameter(torch.tensor(head_dim ** -0.5))
         self.grassman_scale = nn.Parameter(torch.tensor(head_dim ** -0.5))
         self.qkv = Linear(dim, dim * 3, bias=True)
 
@@ -139,7 +143,7 @@ class EuclGrassAtt(nn.Module):
         self.proj = Linear(dim, dim)
         self.proj_drop = Dropout(projection_dropout)
         self.sequence_len = sequence_length
-
+        #self.attn_matrix = nn.Parameter(torch.randn(sequence_length, sequence_length))
         if ln_attention:
             self.conv_attn = nn.Sequential(
                 nn.LayerNorm((2 * num_heads, sequence_length, sequence_length)),
@@ -157,11 +161,14 @@ class EuclGrassAtt(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-
+        # old_shape = q.shape
 
         qgr, _ = grassmanian_point(q)
         kgr, _ = grassmanian_point(k)
-
+        # print(qgr.shape)
+        # # rieem_attn = log_dist(q, k, use_covariance=True, use_log=False)
+        #
+        qgr = qgr  # .permute(0, 1, 3, 2)
         kgr = kgr.permute(0, 1, 3, 2)
 
         dots = torch.matmul(qgr, kgr).unsqueeze(2)
@@ -237,7 +244,7 @@ class ManifoldEncoderLayer(Module):
     """
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 attention_dropout=0.1, drop_path_rate=0.1, attention_type='riem', sequence_length=-1,
+                 attention_dropout=0.1, drop_path_rate=0.1, attention_type='all', sequence_length=-1,
                  ln_attention=False, return_map=False, **kwargs):
         super(ManifoldEncoderLayer, self).__init__()
         self.pre_norm = LayerNorm(d_model)
@@ -245,7 +252,7 @@ class ManifoldEncoderLayer(Module):
             self.self_attn = EuclideanRiemmanianAtt(dim=d_model, num_heads=nhead,
                                                     attention_dropout=attention_dropout, projection_dropout=dropout,
                                                     sequence_length=sequence_length, ln_attention=ln_attention)
-        elif attention_type == 'e_spd_gm':
+        elif attention_type == 'all':
             self.self_attn = EuclRiemGrassAtt(dim=d_model, num_heads=nhead,
                                               attention_dropout=attention_dropout, projection_dropout=dropout,
                                               sequence_length=sequence_length, ln_attention=ln_attention,

@@ -27,7 +27,7 @@ from timm.models.registry import register_model
 from timm.models.vision_transformer import checkpoint_filter_fn, _init_vit_weights
 
 from src.utils.manifold_model import cov_frobenius_norm
-from src.utils.grassman_utils import grassmanian_point
+from src.utils.lds import grassmanian_point
 
 _logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ class WindowAttention(nn.Module):
         return x
 
 
-class EuclideanRiem_WindowAttention(nn.Module):
+class EuclideanSPD_WindowAttention(nn.Module):
     r""" Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
 
@@ -476,8 +476,8 @@ class SwinTransformerBlock(nn.Module):
             self.attn = E_SPD_G_WindowAttention(
                 dim, window_size=to_2tuple(self.window_size), num_heads=num_heads, qkv_bias=qkv_bias,
                 attn_drop=attn_drop, proj_drop=drop, sequence_length=sequence_length, ln_attention=ln_attention)
-        elif attention_type == 'riem':
-            self.attn = EuclideanRiem_WindowAttention(
+        elif attention_type == 'spd':
+            self.attn = EuclideanSPD_WindowAttention(
                 dim, window_size=to_2tuple(self.window_size), num_heads=num_heads, qkv_bias=qkv_bias,
                 attn_drop=attn_drop, proj_drop=drop, sequence_length=sequence_length, ln_attention=ln_attention)
         else:

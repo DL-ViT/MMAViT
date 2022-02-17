@@ -4,13 +4,22 @@ import torch.nn.functional as F
 from einops.layers.torch import Rearrange
 from torch.nn import Module, ModuleList, Linear, Dropout, LayerNorm, Identity, Parameter, init
 from einops import rearrange
-from src.utils.grassman_utils import batch_image_to_Om,grassmanian_point
+from src.utils.lds import batch_image_to_Om,grassmanian_point
 from .stochastic_depth import DropPath
 
 
-################  GRASSMANN LIASSS ######################################33
+################  GRASSMANN  with observability matrix ######################################33
 class NonTrainableObsMatrixModule(nn.Module):
     def __init__(self, image_size=224, patch_size=16, channels=3, m=13, lds_size=3):
+        """
+        observability matrix CONSTRUCTION
+        Args:
+            image_size:
+            patch_size:
+            channels:
+            m:
+            lds_size:
+        """
         super().__init__()
         # image_height, image_width = pair(image_size)
         # patch_height, patch_width = pair(patch_size)
@@ -69,6 +78,16 @@ class ObsMatrixTokenizer(nn.Module):
 
 class ProjectionAttentionKernel(nn.Module):
     def __init__(self, dim, num_heads=8, attention_dropout=0.1, projection_dropout=0.1,sequence_length=-1,qkv_bias=False):
+        """
+        Projection distance on Grassmann Manifolds
+        Args:
+            dim:
+            num_heads:
+            attention_dropout:
+            projection_dropout:
+            sequence_length:
+            qkv_bias:
+        """
         super().__init__()
 
         self.num_heads = num_heads
@@ -78,6 +97,7 @@ class ProjectionAttentionKernel(nn.Module):
         self.qkv = Linear(dim, dim * 3, bias=qkv_bias)
         self.sequence_length = sequence_length
         if self.sequence_length != -1:
+            # normalization layer for distance matrix
             self.norm = nn.LayerNorm(normalized_shape=(self.num_heads, sequence_length, sequence_length))
         self.attn_drop = Dropout(attention_dropout)
         self.proj = Linear(dim, dim)
@@ -91,8 +111,6 @@ class ProjectionAttentionKernel(nn.Module):
         q, _ = grassmanian_point(q)
         k, _ = grassmanian_point(k)
 
-        #q = rearrange(q, 'b h t d -> b h d t').unsqueeze(-1)
-        #k = rearrange(k, 'b h t d -> b h d t').unsqueeze(-2)
         q = q.permute(0,1,3,2).unsqueeze(-1)
         k = k.permute(0,1,3,2).unsqueeze(-2)
         dots = torch.matmul(q, k)
@@ -103,204 +121,13 @@ class ProjectionAttentionKernel(nn.Module):
 
         out = out.permute(0, 2, 1, 3).reshape(B, N, C)
         return self.proj_drop(self.proj(out)),attn
-    # def forward(self, x):
-    #     B, N, C = x.shape
-    #     qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-    #     q, k, v = qkv[0], qkv[1], qkv[2]
-    #
-    #     q, _ = grassmanian_point(q)
-    #     k, _ = grassmanian_point(k)
-    #     q = q.permute(0, 1, 3, 2).unsqueeze(-1)
-    #     k = k.permute(0, 1, 3, 2).unsqueeze(-2)
-    #     # q = rearrange(q, 'b h t d -> b h d t').unsqueeze(-1)
-    #     # k = rearrange(k, 'b h t d -> b h d t').unsqueeze(-2)
-    #
-    #     dots = torch.matmul(q, k)
-    #     attn = self.attn_drop(torch.linalg.norm(dots, dim=2) ** 2.)
-    #     out = torch.matmul(attn, v)
-    #     out = rearrange(out, 'b h n d -> b n (h d)')
-    #     # .transpose(1, 2).reshape(B, N, C)
-    #     return self.proj_drop(self.proj(out))
-
-#
-# class ProjectionAttentionKernel(nn.Module):
-#     def __init__(self, dim, num_heads=8, attention_dropout=0.1, projection_dropout=0.1, sequence_length=-1):
-#         super().__init__()
-#
-#         self.num_heads = num_heads
-#         head_dim = dim // self.num_heads
-#         self.scale = nn.Parameter(torch.tensor(head_dim ** -0.5))
-#         self.sequence_length = sequence_length
-#         self.qkv = Linear(dim, dim * 3, bias=True)
-#         if self.sequence_length != -1:
-#             self.norm = nn.LayerNorm(normalized_shape=(self.num_heads, sequence_length, sequence_length))
-#         self.attn_drop = Dropout(attention_dropout)
-#         self.proj = Linear(dim, dim)
-#         self.proj_drop = Dropout(projection_dropout)
-#     # def forward(self, x):
-#     #     B, N, C = x.shape
-#     #     qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-#     #     q, k, v = qkv[0], qkv[1], qkv[2]
-#     #
-#     #     q, _ = grassmanian_point(q)
-#     #     k, _ = grassmanian_point(k)
-#     #     q = q.permute(0, 1, 3, 2).unsqueeze(-1)
-#     #     k = k.permute(0, 1, 3, 2).unsqueeze(-2)
-#     #     # q = rearrange(q, 'b h t d -> b h d t').unsqueeze(-1)
-#     #     # k = rearrange(k, 'b h t d -> b h d t').unsqueeze(-2)
-#     #
-#     #     dots = torch.matmul(q, k)
-#     #     attn = self.attn_drop(torch.linalg.norm(dots, dim=2) ** 2.)
-#     #     out = torch.matmul(attn, v)
-#     #     out = out.permute(0, 2, 1, 3).reshape(B, N, C)
-#     #     # .transpose(1, 2).reshape(B, N, C)
-#     #     return self.proj_drop(self.proj(out))
-#
-#     def forward(self, x):
-#         B, N, C = x.shape
-#         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv[0], qkv[1], qkv[2]
-#
-#         qgr, _ = grassmanian_point(q)
-#         kgr, _ = grassmanian_point(k)
-#
-#         kgr = kgr.permute(0, 1, 3, 2)
-#
-#         dots = torch.matmul(qgr, kgr).unsqueeze(2)
-#
-#         attn = torch.linalg.norm(dots, dim=2) ** 2. * self.scale
-#         attn = self.norm(attn)
-#         out = torch.matmul(self.attn_drop(attn), v)
-#         out = out.permute(0, 2, 1, 3).reshape(B, N, C)
-#
-#         return self.proj_drop(self.proj(out))
 
 
-# class ProjectionAttentionKernelv2(nn.Module):
-#     def __init__(self, dim, num_heads=8, attention_dropout=0.1, projection_dropout=0.1):
-#         super().__init__()
-#
-#         self.num_heads = num_heads
-#         head_dim = dim // self.num_heads
-#         self.scale = head_dim ** -0.5
-#
-#         self.qkv = Linear(dim, dim * 3, bias=False)
-#
-#         self.attn_drop = Dropout(attention_dropout)
-#         self.proj = Linear(dim, dim)
-#         self.proj_drop = Dropout(projection_dropout)
-#
-#     def forward(self, x):
-#         B, N, C = x.shape
-#         # print(f'x {x.shape}')
-#         qkv = self.qkv(x).chunk(3, dim=-1)
-#         q, k, v = map(lambda t: rearrange(t, 'b t (h d) -> b t h d', h=self.num_heads), qkv)
-#         # v = rearrange(v,'b n h d -> b h n d')
-#         # print(f'q {q.shape} k {k.shape}  v  {v.shape}')
-#         q, _ = grassmanian_point(q)
-#         k, _ = grassmanian_point(k)
-#         # print(f'Gq {q.shape} k {k.shape}  v  {v.shape}')
-#         # q = rearrange(q, 'b t h d  -> b h d t').unsqueeze(-1)
-#         # k = rearrange(k, 'b t h d-> b h d t').unsqueeze(-2)
-#         dots = torch.matmul(q.transpose(-1, -2), k)  # * self.scale
-#         # print(dots.shape)
-#         attn = torch.linalg.norm(dots, dim=(-1, -2), keepdim=True) ** 2.  # *dots
-#         # print(attn.shape)
-#         # attn =  self.attend(attn)
-#         # print(attn.shape,v.shape,q.shape)
-#         # attn = dots
-#         # for i in range(self.heads):
-#         #
-#         #     draw(attn[0,i,:,:].cpu(),name=f'head_{i}')
-#
-#         out = attn * v  # )
-#         out = rearrange(out, 'b t h d -> b t (h d)')
-#         return self.proj(out)
-#
-#
-# class AsimovAttention(nn.Module):
-#     def __init__(self, dim, num_heads=8, attention_dropout=0.1, projection_dropout=0.1):
-#         super().__init__()
-#
-#         self.num_heads = num_heads
-#         head_dim = dim // self.num_heads
-#         self.scale = head_dim ** -0.5
-#
-#         self.qkv = Linear(dim, dim * 3, bias=False)
-#
-#         self.attn_drop = Dropout(attention_dropout)
-#         self.proj = Linear(dim, dim)
-#         self.proj_drop = Dropout(projection_dropout)
-#
-#     def forward(self, x):
-#         B, N, C = x.shape
-#         # print(f'x {x.shape}')
-#         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv[0], qkv[1], qkv[2]
-#         # print(f'q {q.shape} k {k.shape}  v  {v.shape}')
-#         q, _ = grassmanian_point(q)
-#         k, _ = grassmanian_point(k)
-#         q = rearrange(q, 'b h t d -> b h d t').unsqueeze(-1)
-#         k = rearrange(k, 'b h t d -> b h d t').unsqueeze(-2)
-#         dots = torch.matmul(q, k)  # * self.scale
-#         # print(dots.shape)
-#         attn = torch.acos(torch.linalg.norm(dots, dim=2))  # *dots
-#         # attn =  self.attend(attn)
-#         # print(attn.shape,v.shape,q.shape)
-#         # attn = dots
-#         # for i in range(self.heads):
-#         #
-#         #     draw(attn[0,i,:,:].cpu(),name=f'head_{i}')
-#
-#         out = torch.matmul(attn, v)
-#         out = rearrange(out, 'b h n d -> b n (h d)')
-#         return self.proj(out)
-#
-#
-# class ProjectionAttention(nn.Module):
-#     def __init__(self, dim, num_heads=8, attention_dropout=0.1, projection_dropout=0.1):
-#         super().__init__()
-#
-#         self.num_heads = num_heads
-#         head_dim = dim // self.num_heads
-#         self.scale = head_dim ** -0.5
-#
-#         self.qkv = Linear(dim, dim * 3, bias=False)
-#
-#         self.attn_drop = Dropout(attention_dropout)
-#         self.proj = Linear(dim, dim)
-#         self.proj_drop = Dropout(projection_dropout)
-#
-#     def forward(self, x, om=None):
-#         B, N, C = x.shape
-#         # print(f'x {x.shape}')
-#         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv[0], qkv[1], qkv[2]
-#         # print(f'q {q.shape} k {k.shape}  v  {v.shape}')
-#         q, _ = grassmanian_point(q)
-#         k, _ = grassmanian_point(k)
-#
-#         q = rearrange(q, 'b h t d -> b h d t').unsqueeze(-3)
-#         k = rearrange(k, 'b h t d -> b h d t').unsqueeze(-3)
-#         # print(f'q {q.shape}')
-#         ## Projection Distance || QQ^T - KK^T ||_frobenius_norm
-#         qq = torch.matmul(q.transpose(-2, -1), q)
-#         kk = torch.matmul(k.transpose(-2, -1), k)
-#         # print(qq.shape)
-#         abs_qq_kk = torch.abs(qq - kk)
-#
-#         attn = torch.softmax(torch.linalg.norm(abs_qq_kk, dim=-3), dim=-1)  # *dots
-#
-#         # print(f'attn {attn.shape}  qq-kk {abs_qq_kk.shape} v {v.shape}')
-#
-#         out = torch.matmul(attn, v)
-#         out = rearrange(out, 'b h n d -> b n (h d)')
-#         return self.proj(out)
-#
 
 class GrassmanianEncoderLayer(Module):
     """
     Inspired by torch.nn.TransformerEncoderLayer and timm.
+    Used in late fusion models and model with observability matrix
     """
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
@@ -342,9 +169,24 @@ class GrassmanianformerClassifier(Module):
                  attention_dropout=0.1,
                  stochastic_depth=0.1,
                  positional_embedding='learnable',
-                 use_grassman=True,
                  sequence_length=None,
                  ln_attention=False):
+        """
+
+        Args:
+            seq_pool:
+            embedding_dim:
+            num_layers:
+            num_heads:
+            mlp_ratio:
+            num_classes:
+            dropout:
+            attention_dropout:
+            stochastic_depth:
+            positional_embedding:
+            sequence_length:
+            ln_attention: layer normalization on attention matrix
+        """
         super().__init__()
         positional_embedding = positional_embedding if \
             positional_embedding in ['sine', 'learnable', 'none'] else 'sine'
@@ -411,7 +253,9 @@ class GrassmanianformerClassifier(Module):
             x = x[:, 0]
 
         x = self.fc(x)
-        return x,w
+        if return_attention:
+            return x,w
+        return x
 
     @staticmethod
     def init_weight(m):

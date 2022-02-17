@@ -71,7 +71,7 @@ def log_dist(x1, x2, use_covariance=True, use_log=False):
 def cov_frobenius_norm(x1, x2):
     x1 = covariance(x1)
     x2 = covariance(x2)
-    print(x1.shape,x2.shape)
+    # distance
     dots = torch.matmul(x1, x2.transpose(-1, -2)).unsqueeze(2)
 
     attn_spd = torch.linalg.norm(dots, dim=2)
