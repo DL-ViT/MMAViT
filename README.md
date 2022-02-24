@@ -15,6 +15,60 @@ Multi-manifold multi-head attention
 
 
 
+
+### Models and config files
+We've updated this repository and moved the previous training script and the checkpoints associated 
+with it to `examples/`. The new training script here is just the `timm` training script. We've provided
+the checkpoints associated with it in the next section, and the hyperparameters are all provided in
+`configs/pretrained` for models trained from scratch, and `configs/finetuned` for fine-tuned models.
+
+
+
+
+# Results
+
+## Ablation study
+
+| Euclidean | SPD | Grassmann | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 |
+|-----------|-----|-----------|------------|-----------|----------|-----------|
+| X         |     |           | 3.19       | 0.21      | 90.94    | 69.2      |
+|           | X   |           | 3.20       | 0.22      | 84.78    | 67.57     |
+|           |     | X         | 3.19       | 0.22      | 83.83    | 62.36     |
+| X         | X   |           | 3.60       | 0.23      | 92.77    | 75.35     |
+| X         |     | X         | 3.60       | 0.24      | 92.19    | 75.53     |
+|           | X   | X         | 3.60       | 0.24      | 84.21    | 67.84     |
+| X         | X   | X         | 3.81       | 0.25      | 92.91    | 75.70     |
+
+
+## Manifold ViTs
+
+| Method                | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 | MNIST |
+|-----------------------|------------|-----------|----------|-----------|-------|
+| Manifold-ViT-Lite-6/4 | 3.81       | 0.25      | 92.91    | 75.70     | 99.47 |
+| Manifold-CVT-6/4      | 3.78       | 0.24      | 94.63    | 77.05     | 99.42 |
+| Manifold-CCT-7/3×2    | 4.54       | 0.32      | 95.28    | 79.31     | 99.56 |
+
+
+### late fusion models
+
+| Method                 | Euclidean | SPD | Grassmann | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 |
+|------------------------|-----------|-----|-----------|------------|-----------|----------|-----------|
+| gm_riem_vit_6_4_32     |           | X   | X         | 6.62       | 0.44      | 86.07    | 70.19     |
+| img_gm_vit_6_4_32      | X         |     | X         | 6.62       | 0.44      | 91.68    | 73.89     |
+| img_riem_vit_6_4_32    | X         | X   |           | 6.62       | 0.44      | 92.63    | 74.32     |
+| img_gm_riem_vit_6_4_32 | X         | X   | X         | 9.80       | 0.67      | 92.65    | 73.97     |
+
+
+Type can be read in the format `L/PxC` where `L` is the number of transformer
+layers, `P` is the patch/convolution size, and `C` (CCT only) is the number of
+convolutional layers.
+
+
+
+
+
+ 
+
 ## Install locally
 
 ### Requirements
@@ -219,60 +273,6 @@ python train.py -c configs/datasets/cifar10.yml --model grassmanian_vit_6_4_32 -
 
 
 ```
-
-
-### Models and config files
-We've updated this repository and moved the previous training script and the checkpoints associated 
-with it to `examples/`. The new training script here is just the `timm` training script. We've provided
-the checkpoints associated with it in the next section, and the hyperparameters are all provided in
-`configs/pretrained` for models trained from scratch, and `configs/finetuned` for fine-tuned models.
-
-
-
-
-# Results
-
-## Ablation study
-
-| Euclidean | SPD | Grassmann | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 |
-|-----------|-----|-----------|------------|-----------|----------|-----------|
-| X         |     |           | 3.19       | 0.21      | 90.94    | 69.2      |
-|           | X   |           | 3.20       | 0.22      | 84.78    | 67.57     |
-|           |     | X         | 3.19       | 0.22      | 83.83    | 62.36     |
-| X         | X   |           | 3.60       | 0.23      | 92.77    | 75.35     |
-| X         |     | X         | 3.60       | 0.24      | 92.19    | 75.53     |
-|           | X   | X         | 3.60       | 0.24      | 84.21    | 67.84     |
-| X         | X   | X         | 3.81       | 0.25      | 92.91    | 75.70     |
-
-
-## Manifold ViTs
-
-| Method                | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 | MNIST |
-|-----------------------|------------|-----------|----------|-----------|-------|
-| Manifold-ViT-Lite-6/4 | 3.81       | 0.25      | 92.91    | 75.70     | 99.47 |
-| Manifold-CVT-6/4      | 3.78       | 0.24      | 94.63    | 77.05     | 99.42 |
-| Manifold-CCT-7/3×2    | 4.54       | 0.32      | 95.28    | 79.31     | 99.56 |
-
-
-### late fusion models
-
-| Method                 | Euclidean | SPD | Grassmann | Params (M) | FLOPS (G) | CIFAR-10 | CIFAR-100 |
-|------------------------|-----------|-----|-----------|------------|-----------|----------|-----------|
-| gm_riem_vit_6_4_32     |           | X   | X         | 6.62       | 0.44      | 86.07    | 70.19     |
-| img_gm_vit_6_4_32      | X         |     | X         | 6.62       | 0.44      | 91.68    | 73.89     |
-| img_riem_vit_6_4_32    | X         | X   |           | 6.62       | 0.44      | 92.63    | 74.32     |
-| img_gm_riem_vit_6_4_32 | X         | X   | X         | 9.80       | 0.67      | 92.65    | 73.97     |
-
-
-Type can be read in the format `L/PxC` where `L` is the number of transformer
-layers, `P` is the patch/convolution size, and `C` (CCT only) is the number of
-convolutional layers.
-
-
-
-
-
- 
 
 
 
