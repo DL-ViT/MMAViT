@@ -203,7 +203,7 @@ class EuclideanRiemmanianAtt(nn.Module):
         self.sequence_len = sequence_length
         if ln_attention:
             self.conv_attn = nn.Sequential(
-                nn.LayerNorm((2 * num_heads, sequence_length, sequence_length)),
+                #nn.LayerNorm((2 * num_heads, sequence_length, sequence_length)),
                 # nn.InstanceNorm2d(2*self.num_heads),
                 nn.Conv2d(in_channels=2 * self.num_heads, out_channels=num_heads, kernel_size=(1, 1))
             )

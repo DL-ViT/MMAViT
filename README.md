@@ -10,6 +10,7 @@ Overview of the network architecture of a Vision Transformer with its main compo
 Multi-manifold multi-head attention
 
 ![Manifold attention](images/mahsa.png)
+
 # How to run
 
 

@@ -64,7 +64,7 @@ config_parser = argparse.ArgumentParser(description='Training Config', add_help=
 config_parser.add_argument('-c', '--config', default='', type=str, metavar='FILE',
                            help='YAML config file specifying default arguments')
 
-checkpoint_dict = {
+checkpoint_dict_cifar10 = {
     'riem': '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results'
              '/cifar10/20220125-151023-manifold_vit_6_4_32-32/model_best.pth.tar',
     'all'  : '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results'
@@ -72,6 +72,15 @@ checkpoint_dict = {
     'gm'   : '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results'
              '/cifar10/20220201-110749-manifold_vit_6_4_32-32/model_best.pth.tar',
 'e':'/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/euclidean/model_best.pth'}
+
+
+
+checkpoint_dict_cifar100 = {
+    'riem': '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results/cifar100/20220125-224527-manifold_vit_6_4_32-32/model_best.pth.tar',
+    'gm'  : '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results/cifar100/20220130-120606-manifold_vit_6_4_32-32/model_best.pth.tar',
+    'all'   : '/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results/cifar100/20220131-100728-manifold_vit_6_4_32-32/model_best.pth.tar',
+'e':'/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/output/paper_results/cifar100/euclidean/vitlite6-4_cifar100.pth'}
+
 
 sample_images = ['./data/CIFAR-10-images-master/val/horse/0010.jpg',
                  './data/CIFAR-10-images-master/val/ship/0045.jpg',
@@ -81,17 +90,21 @@ sample_images = ['./data/CIFAR-10-images-master/val/horse/0010.jpg',
                 # './data/CIFAR-10-images-master/val/ship/0107.jpg'
                  ]
 
+
+sample_images_c100 = ['./data/cifar100/val/cup/0004.png',
+
+                 ]
 # manifold_vit_6_4_32
 # vit_6_4_32
 def arguments():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
     # Dataset / Model parameters
-    parser.add_argument('--resume', default=checkpoint_dict['e'], type=str, metavar='PATH',
+    parser.add_argument('--resume', default=checkpoint_dict_cifar100['e'], type=str, metavar='PATH',
                         help='Resume full model and optimizer state from checkpoint (default: none)')
 
     parser.add_argument('--attention_type', default='gm', type=str, metavar='ATT',
-                        help='Type of attention to use', choices=('self', 'gm', 'riem', 'all'))
+                        help='Type of attention to use', choices=('self', 'gm', 'riem', 'all','spd'))
 
     parser.add_argument('--dataset', '-d', metavar='NAME', default='',
                         help='dataset type (default: ImageFolder/ImageTar if empty)')
@@ -256,7 +269,8 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616]),
     ])
-    im = Image.open(sample_images[-1]
+    img_path = sample_images_c100[0]
+    im = Image.open(sample_images_c100[0]
                     )
     x = transform(im)
 
@@ -301,18 +315,21 @@ def main():
     ax3.set_title('Attention Map ')
     _ = ax1.imshow(im)
     _ = ax2.imshow(cam)
-    _ = ax3.imshow(hm  )
+    _ = ax3.imshow(hm )
 
     probs = torch.nn.Softmax(dim=-1)(logits)
     top5 = torch.argsort(probs, dim=-1, descending=True)
     print("Prediction Label and Attention Map!\n")
     for idx in top5[0, :5]:
-        print(f'{probs[0, idx.item()] :.5f} : {labels[idx.item()]} ', end='')
+        print(f'{probs[0, idx.item()] :.5f}\t : {idx.item()}\n', end='')
     save_path = args.resume.rsplit('/',1)[0]
-    print(save_path)
-    cv2.imwrite(save_path +'/overlay_ship.jpg', cv2.cvtColor(np.uint8(cam *255 ),
+    print( save_path)
+    overlay_img = f"/overlay{img_path.replace('/','_')}.jpg"
+    print(overlay_img)
+    cv2.imwrite(save_path +overlay_img, cv2.cvtColor(np.uint8(cam *255 ),
                                                                                              cv2.COLOR_RGB2BGR))
-    cv2.imwrite(save_path +'/map_ship.jpg',
+    overlay_img = f"/map{img_path.replace('/', '_')}.jpg"
+    cv2.imwrite(save_path +overlay_img,
                 cv2.cvtColor(np.uint8(hm*255), cv2.COLOR_RGB2BGR))
 
     # axs[0, 1].plot(x, y, 'tab:orange')
@@ -486,7 +503,118 @@ def sublpot_attention():
 
     plt.show()
 
+
+def sublpot_attention_cifar100():
+    """
+    Plot attention scores on the image
+    """
+    im = Image.open(
+        'data/cifar100/val/cup/0004.png')
+    im_all = Image.open(
+        "output/paper_results/cifar100/20220130-120606-manifold_vit_6_4_32-32/overlay._data_cifar100_val_cup_0004.png.jpg")
+    im_gm = Image.open(
+        "output/paper_results/cifar100/20220131-100728-manifold_vit_6_4_32-32/overlay._data_cifar100_val_cup_0004.png.jpg")
+    im_spd = Image.open('output/paper_results/cifar100/20220125-224527-manifold_vit_6_4_32-32/overlay._data_cifar100_val_cup_0004.png.jpg')
+    im_e = Image.open('output/paper_results/cifar100/euclidean/overlay._data_cifar100_val_cup_0004.png.jpg')
+
+    fig, axs = plt.subplots(3, 5,  sharex=True, sharey=True,squeeze=True,gridspec_kw={'wspace':0, 'hspace':0},)
+    fig.tight_layout()
+    im = cv2.resize(np.array(im), (224, 224))
+    axs[0, 0].set_xticks([])
+    axs[0, 0].set_yticks([])
+    axs[0, 0].imshow(im)
+    #axs[0, 0].set_title('Image')
+    axs[0, 1].set_xticks([])
+    axs[0, 1].set_yticks([])
+    axs[0, 1].imshow(im_e)
+    #axs[0, 1].set_title('E')
+    axs[0, 2].set_xticks([])
+    axs[0, 2].set_yticks([])
+    axs[0, 2].imshow(im_spd)
+    #axs[0, 2].set_title('E_SPD')
+    axs[0, 3].set_xticks([])
+    axs[0, 3].set_yticks([])
+    axs[0, 3].imshow(im_gm)
+    #axs[0, 3].set_title('E_G')
+    axs[0, 4].set_xticks([])
+    axs[0, 4].set_yticks([])
+    axs[0, 4].imshow(im_all)
+    #axs[0, 4].set_title('E_SPD_G')
+
+
+
+
+    ##################################################33
+
+    im = Image.open(
+        'data/cifar100/val/boy/0001.png')
+    im_all = Image.open(
+        "output/paper_results/cifar100/20220130-120606-manifold_vit_6_4_32-32/overlay._data_cifar100_val_boy_0001.png.jpg")
+    im_gm = Image.open(
+        "output/paper_results/cifar100/20220131-100728-manifold_vit_6_4_32-32/overlay._data_cifar100_val_boy_0001.png.jpg")
+    im_spd = Image.open('output/paper_results/cifar100/20220125-224527-manifold_vit_6_4_32-32/overlay._data_cifar100_val_boy_0001.png.jpg')
+    im_e = Image.open('output/paper_results/cifar100/euclidean/overlay._data_cifar100_val_boy_0001.png.jpg')
+
+
+
+    im = cv2.resize(np.array(im), (224, 224))
+    axs[1, 0].set_xticks([])
+    axs[1, 0].set_yticks([])
+    axs[1, 0].imshow(im)
+    axs[1, 1].set_xticks([])
+    axs[1, 1].set_yticks([])
+    axs[1, 1].imshow(im_e)
+    axs[1, 2].set_xticks([])
+    axs[1, 2].set_yticks([])
+    axs[1, 2].imshow(im_spd)
+
+    axs[1, 3].set_xticks([])
+    axs[1, 3].set_yticks([])
+    axs[1, 3].imshow(im_gm)
+
+    axs[1, 4].set_xticks([])
+    axs[1, 4].set_yticks([])
+    axs[1, 4].imshow(im_all)
+
+
+    ##################################################33
+
+    im = Image.open(
+        'data/cifar100/val/bear/0001.png')
+    im_gm = Image.open(
+        "output/paper_results/cifar100/20220130-120606-manifold_vit_6_4_32-32/overlay._data_cifar100_val_bear_0001.png.jpg")
+    im_all = Image.open(
+        "output/paper_results/cifar100/20220131-100728-manifold_vit_6_4_32-32/overlay._data_cifar100_val_bear_0001.png.jpg")
+    im_spd = Image.open('output/paper_results/cifar100/20220125-224527-manifold_vit_6_4_32-32/overlay._data_cifar100_val_bear_0001.png.jpg')
+    im_e = Image.open('output/paper_results/cifar100/euclidean/overlay._data_cifar100_val_bear_0001.png.jpg')
+    im = cv2.resize(np.array(im), (224, 224))
+    axs[2, 0].set_xticks([])
+    axs[2, 0].set_yticks([])
+    axs[2, 0].imshow(im)
+    axs[2, 1].set_xticks([])
+    axs[2, 1].set_yticks([])
+    axs[2, 1].imshow(im_e)
+    axs[2, 2].set_xticks([])
+    axs[2, 2].set_yticks([])
+    axs[2, 2].imshow(im_spd)
+
+    axs[2, 3].set_xticks([])
+    axs[2, 3].set_yticks([])
+    axs[2, 3].imshow(im_gm)
+
+    axs[2, 4].set_xticks([])
+    axs[2, 4].set_yticks([])
+    axs[2, 4].imshow(im_all)
+
+    plt.show()
+
 #sublpot_image_patches()
 #sublpot_attention()
 if __name__ == '__main__':
-    sublpot_attention()
+    sublpot_attention_cifar100()
+
+# import os
+# import glob
+#
+# os.chdir('/home/iliask/Desktop/ilias/QCONPASS/Object_detection_research/Compact-Transformers/data/cifar100/val')
+# print(glob.glob(os.getcwd()))
