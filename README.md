@@ -1,4 +1,4 @@
-#  Manifold Attention Vision Transformers
+#  Multi-Manifold Attention Vision Transformers
 
 
 
