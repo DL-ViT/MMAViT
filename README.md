@@ -1,8 +1,22 @@
 #  Multi-Manifold Attention Vision Transformers
 
+This work proposes a novel attention
+mechanism, called multi-manifold attention, that can substitute
+any standard attention mechanism in a Transformer-based network. The proposed attention models the input space in three
+distinct manifolds, namely Euclidean, Symmetric Positive Definite and Grassmann, with different statistical and geometrical
+properties, guiding the network to take into consideration a
+rich set of information that describe the appearance, color and
+texture of an image, for the computation of a highly descriptive
+attention map. In this way, a Vision Transformer with the
+proposed attention is guided to become more attentive towards
+discriminative features, leading to improved classification results,
+as shown by the experimental results on several well-known
+image classification datasets.
+
+Overview of the network architecture of the Vision Transformer with its main components	
 
 
-Overview of the network architecture of a Vision Transformer with its main components	
+![Paper](https://arxiv.org/pdf/2207.08569v1.pdf)
 
 ![VIT](images/vit.png)
 
